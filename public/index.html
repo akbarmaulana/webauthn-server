@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>WebAuthn Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 480px; margin: 60px auto; color: #1a1a1a; }
+  h1 { font-size: 1.4rem; }
+  input { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; font-size: 1rem; }
+  button { width: 100%; padding: 10px; margin: 6px 0; font-size: 1rem; cursor: pointer; }
+  #log { background: #f4f4f4; padding: 12px; margin-top: 20px; border-radius: 6px; white-space: pre-wrap; font-size: 0.85rem; max-height: 260px; overflow-y: auto; }
+  .row { display: flex; gap: 8px; }
+  .row button { flex: 1; }
+</style>
+</head>
+<body>
+  <h1>WebAuthn (Passkey) Demo</h1>
+  <input id="username" placeholder="username (e.g. email)" autocomplete="username webauthn" />
+  <div class="row">
+    <button id="btnRegister">Register passkey</button>
+    <button id="btnLogin">Login with passkey</button>
+  </div>
+  <button id="btnMe">Check session (/me)</button>
+  <button id="btnLogout">Logout</button>
+  <div id="log"></div>
+
+  <script src="https://unpkg.com/@simplewebauthn/browser@11/dist/bundle/index.umd.min.js"></script>
+  <script>
+    const { startRegistration, startAuthentication } = SimpleWebAuthnBrowser;
+    const logEl = document.getElementById('log');
+    const log = (label, data) => {
+      logEl.textContent = `[${label}]\n` + JSON.stringify(data, null, 2) + '\n\n' + logEl.textContent;
+    };
+
+    async function postJSON(url, body) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    document.getElementById('btnRegister').addEventListener('click', async () => {
+      const username = document.getElementById('username').value.trim();
+      if (!username) return alert('Enter a username first');
+      try {
+        const options = await postJSON('/api/webauthn/register/options', { username });
+        log('register/options', options);
+
+        const attResp = await startRegistration({ optionsJSON: options });
+        log('authenticator attestation', attResp);
+
+        const verification = await postJSON('/api/webauthn/register/verify', { username, response: attResp });
+        log('register/verify', verification);
+        alert('Passkey registered!');
+      } catch (err) {
+        log('error', String(err));
+        alert('Registration failed: ' + err.message);
+      }
+    });
+
+    document.getElementById('btnLogin').addEventListener('click', async () => {
+      const username = document.getElementById('username').value.trim();
+      if (!username) return alert('Enter a username first');
+      try {
+        const options = await postJSON('/api/webauthn/login/options', { username });
+        log('login/options', options);
+
+        const authResp = await startAuthentication({ optionsJSON: options });
+        log('authenticator assertion', authResp);
+
+        const verification = await postJSON('/api/webauthn/login/verify', { username, response: authResp });
+        log('login/verify', verification);
+        alert('Logged in as ' + verification.username);
+      } catch (err) {
+        log('error', String(err));
+        alert('Login failed: ' + err.message);
+      }
+    });
+
+    document.getElementById('btnMe').addEventListener('click', async () => {
+      const res = await fetch('/api/webauthn/me', { credentials: 'include' });
+      log('me', await res.json());
+    });
+
+    document.getElementById('btnLogout').addEventListener('click', async () => {
+      const res = await fetch('/api/webauthn/logout', { method: 'POST', credentials: 'include' });
+      log('logout', await res.json());
+    });
+  </script>
+</body>
+</html>
