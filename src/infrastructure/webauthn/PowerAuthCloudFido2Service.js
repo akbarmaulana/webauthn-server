@@ -38,7 +38,7 @@ class PowerAuthCloudFido2Service {
     this.appId = appId;
     this.rpID = rpID;
     this.rpName = rpName;
-    this.origin = origin;
+    this.origin = origin.replace(/\/+$/, '');
     this.loginTemplateName = loginTemplateName;
     this.debug = debug;
   }
