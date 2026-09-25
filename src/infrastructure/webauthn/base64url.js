@@ -48,4 +48,26 @@ function isActivationCodeShaped(challenge) {
   return ACTIVATION_CODE_PATTERN.test(challenge);
 }
 
-module.exports = { encodeOpaqueChallenge, decodeOpaqueChallenge, isActivationCodeShaped };
+function base64UrlToBase64(base64url) {
+  let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4 !== 0) {
+    base64 += '=';
+  }
+  return base64;
+}
+
+/**
+ * Convert a fixed list of fields on an object from Base64URL to standard Base64.
+ * Skips fields that are missing/null (e.g. userHandle on non-resident-key assertions).
+ */
+function convertFieldsToBase64(obj, fields) {
+  const converted = { ...obj };
+  for (const field of fields) {
+    if (converted[field]) {
+      converted[field] = base64UrlToBase64(converted[field]);
+    }
+  }
+  return converted;
+}
+
+module.exports = { encodeOpaqueChallenge, decodeOpaqueChallenge, isActivationCodeShaped, base64UrlToBase64, convertFieldsToBase64 };

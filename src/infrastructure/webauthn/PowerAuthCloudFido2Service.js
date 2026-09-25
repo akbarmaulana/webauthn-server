@@ -1,4 +1,4 @@
-const { encodeOpaqueChallenge, decodeOpaqueChallenge, isActivationCodeShaped } = require('./base64url');
+const { encodeOpaqueChallenge, decodeOpaqueChallenge, isActivationCodeShaped, base64UrlToBase64 } = require('./base64url');
 
 /**
  * PowerAuthCloudFido2Service -- infrastructure adapter implementing the SAME
@@ -131,17 +131,16 @@ class PowerAuthCloudFido2Service {
       // the Base64URL form we handed the browser.
       expectedChallenge: decodeOpaqueChallenge(expectedChallenge),
       authenticatorParameters: {
-        // response.id is already Base64URL per the WebAuthn spec -- PowerAuth
-        // Cloud's schema takes it verbatim.
-        credentialId: response.id,
+        // response.id datang sebagai Base64URL dari browser -- PowerAuth Cloud
+        // butuh Base64 standar (dikonfirmasi tim Wultra), jadi dikonversi di sini.
+        credentialId: base64UrlToBase64(response.id),
         type: response.type || 'public-key',
         authenticatorAttachment: response.authenticatorAttachment || 'cross-platform',
-        // PowerAuth Cloud wants clientDataJSON/attestationObject as separate
-        // fields (its own structured object), not a single encoded blob --
-        // and again, verbatim Base64URL from the browser, no re-encoding.
+        // clientDataJSON/attestationObject juga Base64URL dari browser --
+        // PowerAuth Cloud butuh Base64 standar untuk keduanya.
         response: {
-          clientDataJSON: response.response.clientDataJSON,
-          attestationObject: response.response.attestationObject,
+          clientDataJSON: base64UrlToBase64(response.response.clientDataJSON),
+          attestationObject: base64UrlToBase64(response.response.attestationObject),
           transports: response.response.transports || [],
         },
         relyingPartyId: this.rpID,
@@ -235,17 +234,16 @@ class PowerAuthCloudFido2Service {
    */
   async verifyAuthenticationResponse({ response, expectedChallenge, credential }) {
     const payload = {
-      credentialId: response.id,
+      credentialId: base64UrlToBase64(response.id),
       type: response.type || 'public-key',
       authenticatorAttachment: response.authenticatorAttachment || 'cross-platform',
       response: {
-        clientDataJSON: response.response.clientDataJSON,
-        authenticatorData: response.response.authenticatorData,
-        signature: response.response.signature,
-        userHandle: response.response.userHandle,
+        clientDataJSON: base64UrlToBase64(response.response.clientDataJSON),
+        authenticatorData: base64UrlToBase64(response.response.authenticatorData),
+        signature: base64UrlToBase64(response.response.signature),
+        // userHandle cuma ada untuk resident-key/discoverable credential
+        userHandle: response.response.userHandle ? base64UrlToBase64(response.response.userHandle) : undefined,
       },
-      // Confirmed against live Swagger: this endpoint uses `applicationId`,
-      // unlike the registrations endpoint which uses `appId`.
       applicationId: this.appId,
       relyingPartyId: this.rpID,
       allowedOrigins: [this.origin],
